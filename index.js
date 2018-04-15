@@ -35,6 +35,12 @@ const GAME_STATES = {
     CONNECT: "_CONNECTMODE",
 };
 
+const RESPONSES = {
+    neutral : "Okay. ",
+    positive : "I'm glad to hear that. ",
+    negative : "Sorry to hear that. "
+}
+
 const newSessionHandlers = {
     "LaunchRequest": function() {
         if (Object.keys(this.attributes).length === 0) {
@@ -65,12 +71,6 @@ const newSessionHandlers = {
     }
 };
 
-// function savePersonalityType(type) {
-//     this.attributes.storage.personalityType = body.results.mediator;
-// }
-
-var personalityType;
-
 const questionStateHandlers = Alexa.CreateStateHandler(GAME_STATES.QUESTION, {
     "AnswerIntent": function() {
         // this.response.speak("You are a " + body.results.mediator
@@ -80,9 +80,26 @@ const questionStateHandlers = Alexa.CreateStateHandler(GAME_STATES.QUESTION, {
 
         var response = this.event.request.intent.slots.answer.value;
         this.attributes['responses'] = this.attributes['responses'].concat(" " + response);
+        
+        var myJSONObject = {
+            'api_key': "c8035c455b999a23470f20f6c76d58f7",
+            'data': response
+        };
+        var res = request('POST', 'https://apiv2.indico.io/sentimenthq', {
+            json: myJSONObject
+        });
+        var data = JSON.parse(res.getBody('utf8')).results;
+
+        var sentimentfulResponse =  RESPONSES.neutral;
+        if (data < 0.25) {
+            sentimentfulResponse = RESPONSES.negative;
+        } else if (data > 0.25) {
+            sentimentfulResponse = RESPONSES.positive;
+        }
+
         var questionNum = this.attributes['questionNum'];
         if (questionNum < QUESTIONS_LENGTH) {
-            this.response.speak(QUESTIONS[questionNum]).listen(QUESTIONS[questionNum]);
+            this.response.speak(sentimentfulResponse + QUESTIONS[questionNum]).listen(QUESTIONS[questionNum]);
             this.attributes['questionNum']++;
             this.emit(":responseReady");
         } else {
