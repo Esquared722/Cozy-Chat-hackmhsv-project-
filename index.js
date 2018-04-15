@@ -1,6 +1,8 @@
 'use strict';
 
-var Alexa = require('alexa-sdk');
+const Alexa = require('alexa-sdk');
+// const request = require('request');
+const request = require('sync-request');
 
 const QUESTIONS = ['Welcome, how are you feeling?',
     'Do you tend to be skeptical or tend to believe?',
@@ -22,21 +24,23 @@ const QUESTIONS = ['Welcome, how are you feeling?',
     //  'Do you work hard or play hard?',
     //  'Are you comfortable with emotions?',
     //  'Do you like public speaking?',
-    ];
+];
+
 
 const QUESTIONS_LENGTH = QUESTIONS.length;
 
 const GAME_STATES = {
     QUESTION: "_QUESTIONMODE", // Asking questions.
     END: "_ENDMODE", //Asking for email and closing out.
+    CONNECT: "_CONNECTMODE",
 };
 
 const newSessionHandlers = {
-    "LaunchRequest": function () {
+    "LaunchRequest": function() {
         if (Object.keys(this.attributes).length === 0) {
             this.attributes.storage = {
-                'personalityType' : null,
-                'email': ""
+                'personalityType': null,
+                'email': undefined
             }
         }
         if (this.attributes.storage.personalityType === null) {
@@ -51,55 +55,139 @@ const newSessionHandlers = {
         this.emit(":responseReady")
     },
     'AMAZON.StopIntent': function() {
-           this.response.speak('Ok, bye!');
-           this.emit(':responseReady');
-     },
-     // Cancel
-     'AMAZON.CancelIntent': function() {
-         this.response.speak('Ok, bye!');
-         this.emit(':responseReady');
-     },
+        this.response.speak('Ok, bye!');
+        this.emit(':responseReady');
+    },
+    // Cancel
+    'AMAZON.CancelIntent': function() {
+        this.response.speak('Ok, bye!');
+        this.emit(':responseReady');
+    }
 };
 
+// function savePersonalityType(type) {
+//     this.attributes.storage.personalityType = body.results.mediator;
+// }
+
+var personalityType;
+
 const questionStateHandlers = Alexa.CreateStateHandler(GAME_STATES.QUESTION, {
-    "AnswerIntent": function () {
+    "AnswerIntent": function() {
+        // this.response.speak("You are a " + body.results.mediator
+        //     + ". Would you like to give your email to connect with others of a similar personality type?").listen("Would you like to save your email?");
+        // this.handler.state = GAME_STATES.END
+        // this.emit(":responseReady");
+
         var response = this.event.request.intent.slots.answer.value;
-        this.attributes['responses'] = this.attributes['responses'].concat("" + response);
+        this.attributes['responses'] = this.attributes['responses'].concat(" " + response);
         var questionNum = this.attributes['questionNum'];
         if (questionNum < QUESTIONS_LENGTH) {
             this.response.speak(QUESTIONS[questionNum]).listen(QUESTIONS[questionNum]);
             this.attributes['questionNum']++;
+            this.emit(":responseReady");
         } else {
-            this.attributes.storage.personalityType = "introvert"
-            this.response.speak("You are a " + this.attributes.storage.personalityType + " and your response was" + this.attributes['responses']
-                + ". Would you like to give your email to connect with others of a similar personality type?").listen("Would you like to save your email?");
-            this.handler.state = GAME_STATES.END
+            var myJSONObject = {
+                'api_key': "c8035c455b999a23470f20f6c76d58f7",
+                'data': this.attributes['responses'],
+                'persona': true,
+                'threshold': 0.0
+            };
+            var res = request('POST', 'https://apiv2.indico.io/personality', {
+                json: myJSONObject
+            });
+            var data = JSON.parse(res.getBody('utf8'));
+            data = data.results;
+            console.log(data);
+            var maxNum = -1;
+            var maxType = null;
+            for (var key in data) {
+                if (data[key] > maxNum) {
+                    maxNum = data[key];
+                    maxType = key;
+                }
+            }
+            this.attributes.storage.personalityType = maxType;
+            this.response.speak("Congrats you are a " +
+                maxType + ". Would you like to give your email to connect with others of a similar personality type?").listen("Would you like to save your email?");
+            this.handler.state = GAME_STATES.END;
+            this.emit(":responseReady");
         }
-        this.emit(":responseReady")
     },
-       
+
 });
 
-const connectStateHandlers = Alexa.CreateStateHandler(GAME_STATES.END, {
+const emailStateHandlers = Alexa.CreateStateHandler(GAME_STATES.END, {
+    "LaunchRequest": function() {
+        if (this.attributes.storage.email === null) {
+            this.response.speak("Would you like to give your email to connect with others of a similar personality type?").listen("Would you like to save your email?");
+            this.emit(":responseReady")
+        } else {
+            this.response.speak("Would you like to connect with others?").listen("Would you like to connect with others?");
+            this.handler.state = GAME_STATES.CONNECT;
+            this.emit(":responseReady")
+        }
+    },
     "AnswerIntent": function() {
         var emaily = this.event.request.intent.slots.answer.value;
         this.attributes.storage.email = emaily;
         this.emit(':saveState', true);
     },
     "AMAZON.YesIntent": function() {
-        this.response.speak("What is your email?").listen("What is your email?");
-        this.emitWithState("AnswerIntent")
+        this.response.speak("What is your email?" + personalityType).listen("What is your email?");
+        this.emit(":responseReady")
     },
-    "AMAZON.NoIntent": function () {
+    "AMAZON.NoIntent": function() {
         this.response.speak("Okay");
         this.emit(':responseReady')
     },
-});
-    
+    'AMAZON.StopIntent': function() {
+        this.response.speak('Ok, hope we will chat again soon.');
+        this.emit(':responseReady');
+    },
 
-exports.handler = function(event, context, callback){
+    // Cancel
+    'AMAZON.CancelIntent': function() {
+        this.response.speak('Ok, hope we will chat again soon.');
+        this.emit(':responseReady');
+    },
+    'SessionEndedRequest': function() {
+        console.log('session ended!');
+        this.emit(':saveState', true);
+    }
+});
+
+const connectStateHandlers = Alexa.CreateStateHandler(GAME_STATES.CONNECT, {
+    "LaunchRequest": function() {
+        this.response.speak("Would you like to connect with others?").listen("Would you like to connect with others?");
+        this.emit(":responseReady")
+    },
+    "AMAZON.YesIntent": function() {
+        this.response.speak("Here is a friend");
+        this.emit(":responseReady")
+    },
+    "AMAZON.NoIntent": function() {
+        this.response.speak("Sorry");
+        this.emit(':responseReady')
+    },
+    'AMAZON.StopIntent': function() {
+        this.response.speak('Ok, hope we will chat again soon.');
+        this.emit(':responseReady');
+    },
+    // Cancel
+    'AMAZON.CancelIntent': function() {
+        this.response.speak('Ok, let\'s play again soon.');
+        this.emit(':responseReady');
+    },
+    'SessionEndedRequest': function() {
+        console.log('session ended!');
+        this.emit(':saveState', true);
+    }
+});
+
+
+exports.handler = function(event, context, callback) {
     var alexa = Alexa.handler(event, context);
     alexa.dynamoDBTableName = 'user';
-    alexa.registerHandlers(newSessionHandlers, questionStateHandlers, connectStateHandlers);
+    alexa.registerHandlers(newSessionHandlers, questionStateHandlers, emailStateHandlers, connectStateHandlers);
     alexa.execute();
 };
