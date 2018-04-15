@@ -1,4 +1,4 @@
 # hackmhsv-project
 
-##index.js is used for Lambda Function. 
+index.js is used for Lambda Function. 
 
