@@ -5,8 +5,8 @@ var Alexa = require('alexa-sdk');
 const QUESTIONS = ['Welcome, how are you feeling?',
     'Do you tend to be skeptical or tend to believe?',
     'Are you bored by time alone or need time alone?',
-    'Do you accept things as they are? ',
-     'Are your energetic or mellow?',
+    // 'Do you accept things as they are? ',
+    //  'Are your energetic or mellow?',
     //  'Are you chaotic or organized?',
     //  'Do you work best in groups or alone?',
     //  'Do you plan far ahead or plan last minute?',
@@ -21,24 +21,23 @@ const QUESTIONS = ['Welcome, how are you feeling?',
     //  'Do you find it difficult to yell loudly?',
     //  'Do you work hard or play hard?',
     //  'Are you comfortable with emotions?',
-    //  'Do you like public speaking?'
+    //  'Do you like public speaking?',
     ];
 
 const QUESTIONS_LENGTH = QUESTIONS.length;
 
 const GAME_STATES = {
-    START: "_STARTMODE", //Start asking questions.
     QUESTION: "_QUESTIONMODE", // Asking questions.
     END: "_ENDMODE", //Asking for email and closing out.
-    // START: "_STARTMODE", // Entry point, start the game.
-    // HELP: "_HELPMODE", // The user is asking for help.
 };
 
 const newSessionHandlers = {
     "LaunchRequest": function () {
-        this.attributes.storage = {
-            'personalityType' : null,
-            'email': ""
+        if (Object.keys(this.attributes).length === 0) {
+            this.attributes.storage = {
+                'personalityType' : null,
+                'email': ""
+            }
         }
         if (this.attributes.storage.personalityType === null) {
             this.handler.state = GAME_STATES.QUESTION;
@@ -72,36 +71,29 @@ const questionStateHandlers = Alexa.CreateStateHandler(GAME_STATES.QUESTION, {
             this.attributes['questionNum']++;
         } else {
             this.attributes.storage.personalityType = "introvert"
-            this.response.speak("You are a" + this.attributes.storage.personalityType + "and your response was" + this.attributes['responses']).listen("Thanks!");
+            this.response.speak("You are a " + this.attributes.storage.personalityType + " and your response was" + this.attributes['responses']
+                + ". Would you like to give your email to connect with others of a similar personality type?").listen("Would you like to save your email?");
             this.handler.state = GAME_STATES.END
         }
         this.emit(":responseReady")
     },
-    'AMAZON.StopIntent': function() {
-           this.response.speak('Ok, bye!');
-           this.emit(':responseReady');
-     },
-     // Cancel
-     'AMAZON.CancelIntent': function() {
-         this.response.speak('Ok, bye!');
-         this.emit(':responseReady');
-     },
+       
 });
 
 const connectStateHandlers = Alexa.CreateStateHandler(GAME_STATES.END, {
     "AnswerIntent": function() {
-        this.handler.state = GAME_STATES.END;
-        this.response.speak("Would you like to give your email so others of your same personality type can contact you?")
-        .listen("Would you like to give your email so others of your same personality type can contact you?")
         var emaily = this.event.request.intent.slots.answer.value;
         this.attributes.storage.email = emaily;
+        this.emit(':saveState', true);
     },
-    
-     // Save state
-   'SessionEndedRequest': function() {
-       console.log('session ended!');
-       this.emit(':saveState', true);
-     }
+    "AMAZON.YesIntent": function() {
+        this.response.speak("What is your email?").listen("What is your email?");
+        this.emitWithState("AnswerIntent")
+    },
+    "AMAZON.NoIntent": function () {
+        this.response.speak("Okay");
+        this.emit(':responseReady')
+    },
 });
     
 

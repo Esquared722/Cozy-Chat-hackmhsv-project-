@@ -72,24 +72,6 @@ const handlers = {
         .listen("Rock, paper, or scissors?");
         this.emit(":responseReady");
     },
-     'AMAZON.StopIntent': function() {
-           this.response.speak('Ok, let\'s play again soon.');
-           this.emit(':responseReady');
-     },
-
-     // Cancel
-     'AMAZON.CancelIntent': function() {
-         this.response.speak('Ok, let\'s play again soon.');
-         this.emit(':responseReady');
-     },
-     
-     // Help
-      'AMAZON.HelpIntent': function() {
-        this.response.speak("This skill plays rock, paper, scissors with you. It also keeps track of your wins and times used for each move. Would you like to play rock paper or scissors?").listen("Rock, paper, or scissors?");
-        this.emit(':responseReady');
-     },
-   
-   
      // Save state
    'SessionEndedRequest': function() {
        console.log('session ended!');
