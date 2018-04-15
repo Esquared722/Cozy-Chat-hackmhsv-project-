@@ -1,7 +1,6 @@
 'use strict';
 
 const Alexa = require('alexa-sdk');
-// const request = require('request');
 const request = require('sync-request');
 
 const QUESTIONS = ['Welcome, how are you feeling?',
@@ -36,7 +35,7 @@ const GAME_STATES = {
 };
 
 const RESPONSES = {
-    neutral : "Okay. ",
+    neutral : "",
     positive : "I'm glad to hear that. ",
     negative : "Sorry to hear that. "
 }
@@ -46,7 +45,7 @@ const newSessionHandlers = {
         if (Object.keys(this.attributes).length === 0) {
             this.attributes.storage = {
                 'personalityType': null,
-                'email': undefined
+                'email': "null"
             }
         }
         if (this.attributes.storage.personalityType === null) {
@@ -73,10 +72,6 @@ const newSessionHandlers = {
 
 const questionStateHandlers = Alexa.CreateStateHandler(GAME_STATES.QUESTION, {
     "AnswerIntent": function() {
-        // this.response.speak("You are a " + body.results.mediator
-        //     + ". Would you like to give your email to connect with others of a similar personality type?").listen("Would you like to save your email?");
-        // this.handler.state = GAME_STATES.END
-        // this.emit(":responseReady");
 
         var response = this.event.request.intent.slots.answer.value;
         this.attributes['responses'] = this.attributes['responses'].concat(" " + response);
@@ -91,9 +86,9 @@ const questionStateHandlers = Alexa.CreateStateHandler(GAME_STATES.QUESTION, {
         var data = JSON.parse(res.getBody('utf8')).results;
 
         var sentimentfulResponse =  RESPONSES.neutral;
-        if (data < 0.25) {
+        if (data < 0.5) {
             sentimentfulResponse = RESPONSES.negative;
-        } else if (data > 0.25) {
+        } else if (data > 0.95) {
             sentimentfulResponse = RESPONSES.positive;
         }
 
@@ -125,7 +120,7 @@ const questionStateHandlers = Alexa.CreateStateHandler(GAME_STATES.QUESTION, {
             }
             this.attributes.storage.personalityType = maxType;
             this.response.speak("Congrats you are a " +
-                maxType + ". Would you like to give your email to connect with others of a similar personality type?").listen("Would you like to save your email?");
+                maxType + ". Would you like to save your email to connect with other " + this.attributes.storage.personalityType + "s?").listen("Would you like to save your email?");
             this.handler.state = GAME_STATES.END;
             this.emit(":responseReady");
         }
@@ -135,33 +130,37 @@ const questionStateHandlers = Alexa.CreateStateHandler(GAME_STATES.QUESTION, {
 
 const emailStateHandlers = Alexa.CreateStateHandler(GAME_STATES.END, {
     "LaunchRequest": function() {
-        if (this.attributes.storage.email === null) {
-            this.response.speak("Would you like to give your email to connect with others of a similar personality type?").listen("Would you like to save your email?");
-            this.emit(":responseReady")
+        var personalityType = this.attributes.storage.personalityType;
+        if (this.attributes.storage.email === "null") {
+            this.response.speakthis.response.speak("Would you like to save your email to connect with other " + personalityType + "s?")
+                    .listen("Would you like to save your email to connect with other " + personalityType + "s?");
+            this.emit(":responseReady");
         } else {
-            this.response.speak("Would you like to connect with others?").listen("Would you like to connect with others?");
+            this.response.speak("Would you like to connect with other " + personalityType + "s?").listen("Would you like to connect with other " + personalityType + "s?");
             this.handler.state = GAME_STATES.CONNECT;
-            this.emit(":responseReady")
+            this.emit(":responseReady");
         }
     },
     "AnswerIntent": function() {
         var emaily = this.event.request.intent.slots.answer.value;
         this.attributes.storage.email = emaily;
-        this.emit(':saveState', true);
+        var personalityType = this.attributes.storage.personalityType;
+        this.response.speak("Would you like to connect with other " + personalityType + "s?").listen("Would you like to connect with other " + personalityType + "s?");
+        this.handler.state = GAME_STATES.CONNECT;
+        this.emit(':responseReady')
     },
     "AMAZON.YesIntent": function() {
-        this.response.speak("What is your email?" + personalityType).listen("What is your email?");
+        this.response.speak("What is your email?").listen("What is your email?");
         this.emit(":responseReady")
     },
     "AMAZON.NoIntent": function() {
-        this.response.speak("Okay");
+        this.response.speak("Okay.");
         this.emit(':responseReady')
     },
     'AMAZON.StopIntent': function() {
         this.response.speak('Ok, hope we will chat again soon.');
         this.emit(':responseReady');
     },
-
     // Cancel
     'AMAZON.CancelIntent': function() {
         this.response.speak('Ok, hope we will chat again soon.');
@@ -175,15 +174,16 @@ const emailStateHandlers = Alexa.CreateStateHandler(GAME_STATES.END, {
 
 const connectStateHandlers = Alexa.CreateStateHandler(GAME_STATES.CONNECT, {
     "LaunchRequest": function() {
-        this.response.speak("Would you like to connect with others?").listen("Would you like to connect with others?");
+        var personalityType = this.attributes.storage.personalityType;
+        this.response.speak("Would you like to connect with other " + personalityType + "s?").listen("Would you like to connect with other " + personalityType + "s?");
         this.emit(":responseReady")
     },
     "AMAZON.YesIntent": function() {
-        this.response.speak("Here is a friend");
+        this.response.speak("Here is a friend!");
         this.emit(":responseReady")
     },
     "AMAZON.NoIntent": function() {
-        this.response.speak("Sorry");
+        this.response.speak("Okay.");
         this.emit(':responseReady')
     },
     'AMAZON.StopIntent': function() {
